@@ -1,0 +1,864 @@
+```{r libs  }
+require(tidyverse)
+require(tidyquant)
+
+```
+
+here I will import some long term data from BB data
+
+first let me try the international commodity price
+
+```{r icim  }
+library(readxl)
+path <- "./RAWDATA/statisticaltable_dec2016.xls"
+int.price.raw <- read_excel(path, sheet="Table XXII",range=cell_rows(28:57), col_names=FALSE)
+```
+
+Now time to name the variables
+
+```{r nv  }
+var.labs <- c(month="Calendar months",
+	      gold="Gold price, US$/Troy Ounce, UK(London)",
+	      coal="Coal price, US$/MT,Australia", 
+	      iron_ore="Iron Ore, US$/MT, China(CFR Tianjin Port",
+	      petroleum1="Petroleum, US$/Barrel, Dubai Fateh",
+	      petroleum2="Petroleum, US$/Barrel, UK Brent",
+	      cotton="Cotton, US cents/pound, Liverpool index",
+	      super_pphate="Super phosphate, US$/MT, USA, gulf ports",
+	      urea="Urea, US$/MT, Ukraine",
+	      rice1="Rice, US$/MT, Thailand(Bangkok)",
+	      rice2="Rice, US$/MT, Thailand",
+	      wheat1="Wheat, US$/MT, Australia",
+	      wheat2="Wheat, US$/MT, United States",
+	      wheat3="Wheat, US$/MT, Argentina",
+	      palm_oil1="Palm Oil, US$/MT, Malaysia, NW Europe",
+	      palm_oil2="Palm Oil, US$/MT, Malaysia",
+	      soya_bean1="Soya Bean, US$/MT, USA(Rotterdam)",
+	      soya_bean2="Soya Bean Oil, US$/MT, All origins (Dutch ports)",
+	      sugar1="Sugar, US cents/pound, EU Import Price",
+	      sugar2="Sugar, US cents/pound, Free Market",
+	      sugar3="Sugar, US cents/pound, US Import price")
+
+names(int.price.raw) <- names(var.labs)
+int.price <- int.price.raw %>% 
+		filter(!month %in% c(2015,2016))
+int.price.14.16  <- int.price %>% 
+		mutate(year=c(rep(2014,12),rep(2015,12),rep(2016,4)))
+save(int.price.14.16, file="./RDATA/int_price_14_16.RData")
+```
+
+Now let's bring in  another data set
+
+```{r im12  }
+path <- "./RAWDATA/statisticaltable_2014.xls"
+int.price.raw.13 <- read_excel(path, sheet="Table XXIV",range=cell_rows(27:38), col_names=FALSE)
+names(int.price.raw.13) <- names(var.labs)
+int.price.13 <- int.price.raw.13 %>% 
+		    mutate(year=rep(2013,12))
+save(int.price.13, file="./RDATA/int_price_13.RData")
+```
+
+Now time to combine those prices
+
+```{r com  }
+int.price.13.16 <- rbind(int.price.13, int.price.14.16)
+save(int.price.13.16, file="./RDATA/int_price_13_16.RData")
+```
+September 19, 2017  10:14 
+
+now let's check what's in the above int.price.12.16 
+
+10:34 there was definitely some problem which has been fixed and has been changed to int.price.13.16
+
+```{r chi  }
+load("./RDATA/int_price_12_16.RData")
+load("./RDATA/int_price_12.RData")
+load("./RDATA/int_price_14_16.RData")
+```
+
+
+now adding up rest of the datasets
+
+next target is statisticaltable_june13.xls
+
+```{r stab  }
+path <- "./RAWDATA/statisticaltable_june13.xls"
+int.price.11.12.raw <- read_excel(path, sheet="Table XXIV", range=cell_rows(25:49), col_names=FALSE)
+names(int.price.11.12.raw) <- names(var.labs)
+int.price.11.12  <- int.price.11.12.raw %>% 
+			filter(!month %in% 2012) %>% 
+			mutate(year=c(rep(2011,12),rep(2012,12)))
+
+save(int.price.11.12, file="./RDATA/int_price_11_12.RData")
+```
+
+now time to combine this with previous data
+
+```{r c12  }
+int.price.11.16 <- rbind(int.price.11.12, int.price.13.16) %>% 
+                         slice(1:60)  # to start 2016 afresh from begining
+save(int.price.11.16, file="./RDATA/int_price_11_16.RData")
+load("./RDATA/int_price_11_16.RData")
+```
+
+```{r stab1  }
+path <- "./RAWDATA/statisticaltable_sep2017.xlsx"
+int.price.16.17.raw <- read_excel(path, sheet="Table XXII", range=cell_rows(33:50), col_names=FALSE)
+names(int.price.16.17.raw) <- names(var.labs)
+int.price.16.17  <- int.price.16.17.raw %>% 
+			filter(!month %in% 2017) %>% 
+			mutate(year=c(rep(2016,12),rep(2017,5)))
+
+save(int.price.16.17, file="./RDATA/int_price_16_17.RData")
+```
+
+now combine with again of rest of the data
+
+
+```{r stab3  }
+int.price.11.17 <- rbind(int.price.11.16, int.price.16.17)
+int.price.11.17  <- int.price.11.17 %>% 
+		    mutate(yrmon=paste(year,month,sep="-"),
+			   yrmon=as.yearmon(yrmon,format="%Y-%B")
+			   ) %>% 
+		    mutate_at(vars(gold:sugar3),as.numeric)
+
+save(int.price.11.17, file="./RDATA/int_price_11_17.RData")
+```
+
+Now time to draw some charts of international rice price
+
+```{r intchart  }
+load("./RDATA/int_price_11_17.RData")
+#Sep 26 10:39, upon loading just noticed that still year is there, let's get rid of that
+int.price.11.17 <- int.price.11.17 %>% 
+			select(-year, -month)
+int.price.11.17 %>% 
+    ggplot(aes(x=yrmon,y=rice2))+
+	    geom_line()
+```
+
+lets zoom into the last two years
+
+```{r ch2  }
+int.price.11.17 %>% 
+    filter(year(yrmon) > 2014) %>% 
+    ggplot(aes(x=yrmon,y=rice2))+
+	    geom_line()
+
+```
+
+
+It seems that international price is falling rapidly. so its great. then why the crisis? 
+Just because of domestic failings? 
+
+let's compare the above internation price with price we get from FPMU database
+
+
+```{r fpi  }
+url <- read_html("http://fpmu.gov.bd/fpmu-database/0204.htm")
+int.price.fpmu.raw <- url  %>% 
+			html_node("table") %>% 
+			html_table(fill=TRUE) %>% 
+			slice(8:112)
+var.names.int.fmpu <- c("time","us.rice1","us.rice2","us.rice3","thai.rice1", "thai.rice2","thai.rice3","thai.rice4","vietnam.rice","us.wheat1","us.wheat2","argentina.wheat")
+
+names(int.price.fpmu.raw)  <-   var.names.int.fmpu
+save(int.price.fpmu.raw, file="./RDATA/int_price_fpmu_raw.RData")
+
+```
+
+Now let's separate the yearly and monthly data
+
+```{r sep  }
+int.price.fpmu.yr  <- int.price.fpmu.raw %>% 
+			slice(1:14)
+save(int.price.fpmu.yr, file="./RDATA/int_price_fpmu_yr.RData")
+
+int.price.fpmu.mo  <- int.price.fpmu.raw %>% 
+			slice(15:102)
+int.price.fpmu.mo2  <- int.price.fpmu.mo %>% 
+                      filter(!grepl("FY",time)) %>% 
+			mutate(time=sub("(.{3})(.*)\\s(\\d+)","\\1-\\3",time),
+			       time=sub("\\.","-",time),
+			       time=sub("\\s","-",time),
+			       time=sub("([a-zA-Z]{3})([a-zA-Z]*)(\\d+)","\\1-\\3",time),
+			       time=as.yearmon(time,"%b-%Y")
+			       ) 
+int.price.fpmu.mo2  <- int.price.fpmu.mo2 %>% 
+			   mutate_at(vars(-time),as.numeric) 
+save(int.price.fpmu.mo2, file="./RDATA/int_price_fpmu_mo2.RData")
+
+
+
+```
+
+
+Now time to plot all the prices
+
+
+```{r inpfp  }
+load("./RDATA/int_price_fpmu_mo2.RData")
+int.price.fpmu.mo2 %>% 
+      gather(series,price,-time) %>% 
+      ggplot(aes(x=time,y=price)) +
+      geom_line() +
+      facet_wrap(~series)
+```
+
+
+In the above, we find that almost all the prices are falling
+
+now to have more confirmation let's zoom in last few years
+
+```{r inpfpl  }
+int.price.fpmu.mo2 %>% 
+      filter(year(time) > 2013) %>% 
+      select(time, thai.rice1,us.rice1,vietnam.rice) %>% 
+      gather(series,price,-time) %>% 
+      ggplot(aes(x=time,y=price)) +
+      geom_line() +
+      facet_wrap(~series, ncol=1)
+
+```
+
+now let's pick a single series and see what happens
+
+
+
+earlier data are in pdf format, so we will have to use the tabulizer package
+
+```{r tabu  }
+library(tabulizer)
+ locate  <-  "./RAWDATA/june11/econtrdsxxiv.pdf"
+out  <- extract_tables(locate,page=1)
+```
+
+it seems that it did not work at all
+
+July 19, 2017  20:26:
+
+at this point i will take a little digression since I got wealth of information in FPPU data base in the 
+following:
+
+# Average wholesale price of coarse rice
+
+```{r scr  }
+library(rvest)
+rice.price <- read_html("http://fpmu.gov.bd/fpmu-database/0201.htm")
+rice.price.df  <- rice.price %>% 
+			html_node("table") %>%
+			html_table(fill=true) %>% 
+			slice(5:18)
+names(rice.price.df) <- slice(rice.price.df,1)
+rice.price.df <- slice(rice.price.df,-1) # converted to variable name
+rice.price.df <- slice(rice.price.df,-13) # 
+
+save(rice.price.df, file="./RDATA/rice_price_df.RData")   
+
+```
+
+## Sep 20, 2017 
+
+### 08:19 
+
+The above data set is quite ready for further manipulation. Let's have a look at the current situation
+
+```{r cs  }
+load("./RDATA/rice_price_df.RData")
+head(rice.price.df)
+```
+
+now i am planning to use the tidyr package to gather the data
+
+```{r tdp  }
+library(tidyr)
+rice.td <- rice.price.df %>% 
+	    gather(FY,amount,-Month)
+
+rice.td2  <- rice.td %>% 
+		mutate(year=ifelse(Month %in% c("July","August","September","October","November","December"),sub("(.+)\\/(.+)","\\1",FY),sub("(.{2})(.+)\\/(.+)","\\1\\3",FY))) %>% 
+		select(-FY)
+save(rice.td2, file="./RDATA/rice_td2.RData")
+
+```
+
+### 09:28
+
+now so far so good, i managed to come up with a workable solution, now its time to convert the year and month into an yearmon object
+
+```{r ym2  }
+rice.td3  <- rice.td2 %>% 
+		mutate(year=replace(year,year=="1900","2000"),
+		       yrmon=paste(year,Month,sep="-"),
+		       yrmon=as.yearmon(yrmon,"%Y-%B"),
+		       amount=as.numeric(amount)
+		       ) %>% 
+		select(-Month,-year) %>% 
+		select(yrmon,amount) # rearranging
+save(rice.td3, file="./RDATA/rice_td3.RData")
+```
+
+
+Now let's make an attempt to draw a chart
+
+### 10:00
+
+```{r ch  }
+load("./RDATA/rice_td3.RData")
+rice.td3 %>% 
+     ggplot( aes(x=yrmon,y=amount)) +
+		geom_line()	
+```
+
+I tried different way but don't know what the hell the problem is but it seems that there is always it starts from 1900 and it messes up everything. so i had to filter in above. in the following i am going to filter it so that i can save it in a data.frame. (Update: this comment is no longer relevant, it has been fixed)
+
+```{r fixdf  }
+#rice.td4  <- rice.td3 %>% 
+	#	filter(year(yrmon)>1994) 
+```
+
+### 12:46
+
+Breaking news , i discovered the problme, stemmed from 1900/00 dates converted to 1900. all I have to is filter those to 2000 in rice.td2.  so the above rice.td4 is no longer required
+
+okay great, now we are on our way. 
+
+
+Now let's check the data on last five years
+```{r dt5  }
+rice.td3 %>% 
+    filter(year(yrmon) > 2012) %>% 
+     ggplot( aes(x=yrmon,y=amount)) +
+		geom_line()	
+
+```
+
+now  let's first check monthly variation in prices
+
+even before that, let's convert those to yearly prices
+
+
+
+
+
+```{r yr  }
+rice.yr <- rice.td3 %>% 
+	    tq_transmute(select=amount,
+			 mutate_fun=apply.yearly,
+			 FUN=median
+			) 
+
+```
+
+Now time to plot the data
+
+```{r yrp}
+rice.yr %>% 
+    ggplot(aes(x=yrmon,y=amount))+ 
+    geom_line()
+```
+
+Seems like high frequency changes but I would like to find yearly changes
+
+now very simply we could just do this
+
+```{r delt  }
+Delt(rice.yr$amount)
+```
+
+But if we want to have it in tidy format
+
+```{r deltTD  }
+rice.yr.d <- rice.yr %>% 
+    tq_transmute(select=amount,
+		 mutate_fun=Delt,
+		 col_rename="amount") %>% 
+                 filter(!is.na(amount))
+```
+
+Now let's plot these changes
+
+```{r deltplot  }
+rice.yr.d %>% 
+	ggplot(aes(x=yrmon, y=amount,fill=amount)) +
+	    geom_bar(stat="identity")
+```
+
+doesn't seem to have much insight, aman price, for the last few years have been , falling, let's zoom in last couple of years. Update: its not aman price, its the course rice
+
+```{r lstc  }
+rice.td3 %>% 
+    filter(year(yrmon) > 2011) %>%
+    ggplot(aes(x=month(yrmon), y=amount,color=as.factor(year(yrmon))))+
+	   geom_line() +
+	   facet_wrap(~as.factor(year(yrmon))) +
+	   theme_tq()
+
+```
+
+It seems that from May, 2016 price has been steadily rising. 
+
+### 19:43 
+
+Now let's check whether there is any other data source on other rice category
+
+I don't seem to find any other rice information in FPMU but for let's check on the production side
+
+and import data from http://fpmu.gov.bd/fpmu-database/0101.htm
+
+# Food grain availability in Bangladesh
+
+```{r improd  }
+web <- "http://fpmu.gov.bd/fpmu-database/0101.htm"
+
+foodgrain.bd.raw <- read_html(web) %>%
+		    html_node("table") %>% 
+		    html_table(fill=TRUE) %>%
+		    slice(10:29) 
+
+```
+
+So got the basic data up and running and now time to name the variables
+
+```{r nv  }
+var.names <- c("FY","rice.gross.prod","wheat.gross.prod","rice.net.prod","wheat.net.prod",
+	       "population","rice.pri.imp","wheat.pri.imp","rice.pub.dist","wheat.pub.dist",
+	       "rice.procure","wheat.procure", "rice.net.dom.avail", "wheat.net.dom.avail")
+
+foodgrain.bd.raw2  <- foodgrain.bd.raw %>% 
+			select(1,2,3,5,6,8,10,11,13,14,16,17,19,20)
+names(foodgrain.bd.raw2)  <- var.names
+foodgrain.bd  <- foodgrain.bd.raw2 %>% 
+		    mutate_at(var.names[-1],as.numeric) %>% 
+		    mutate(FY=sub("(.+)/(.+)","FY\\2",FY),
+			   FY=factor(FY,levels=FY) # this is important to keep the years in right sort order
+			   )
+save(foodgrain.bd, file="./RDATA/foodgrain_bd.RData")
+```
+
+so here are the variable names
+
+
+```{r vn  }
+names(foodgrain.bd)
+```
+Let's have a quick graph of all the variables
+
+```{r allvars  }
+load("./RDATA/foodgrain_bd.RData")
+foodgrain.bd %>% 
+    gather(vars,value, -FY) %>% 
+    ggplot(aes(x=FY,y=value)) +
+	   geom_line(group="") +
+	   facet_wrap(~vars, ncol=3,scale="free_y")
+```
+
+## Rice production
+
+let's have an overall look at gross production
+
+```{r rprod  }
+foodgrain.bd %>% 
+    ggplot(aes(x=FY,y=rice.gross.prod)) +
+	geom_line(group="")
+```
+let's have a look at the last five year's situation
+
+
+```{r lf  }
+foodgrain.bd %>% 
+    slice(16:20) %>% 
+    ggplot(aes(x=FY,y=rice.gross.prod)) +
+	geom_line(group="")
+
+```
+
+How about private import?
+
+```{r pi  }
+foodgrain.bd %>% 
+    slice(16:20) %>% 
+    ggplot(aes(x=FY,y=rice.pri.imp)) +
+	geom_line(group="")
+
+```
+
+There is sharp decline in private import between FY15 and FY16
+
+
+Let's also have a look at procurement data
+
+
+```{r pd  }
+foodgrain.bd %>% 
+    slice(16:20) %>% 
+    ggplot(aes(x=FY,y=rice.procure)) +
+	geom_line(group="")
+
+
+```
+
+this also experienced sharp fall
+
+now i want to calculate net availability of rice
+
+```{r netav  }
+#foodgrain.bd2  <- foodgrain.bd %>% 
+#	    mutate(rice.net.avail=rice.net.prod+rice.pri.imp-rice.pub.dist+rice.procure)
+```
+
+The above calculation did not match, sw we gave up the effort and included all the net availability of the information. now let's check what's happening
+
+```{r neta  }
+foodgrain.bd %>% 
+    slice(16:20) %>% 
+    ggplot(aes(x=FY,y=rice.net.dom.avail)) + 
+               geom_line(group="")
+```
+
+in the above we see that net rice availability is going down
+
+
+Let's have a look at monthly data of public closing stock of rice
+
+```{r pubRice  }
+url  <- read_html("http://fpmu.gov.bd/fpmu-database/0601.htm")
+rice.pub.cl.mo.raw <- url %>% 
+		  html_node("table") %>% 
+		  html_table() %>% 
+		  slice(4:16)
+names(rice.pub.cl.mo.raw)  <- rice.pub.cl.mo.raw %>% 
+				    slice(1)
+rice.pub.cl.mo.raw2  <- rice.pub.cl.mo.raw %>% 
+			slice(-1)
+rice.pub.cl.mo  <- rice.pub.cl.mo.raw2 %>% 
+		     gather(FY,amount,-Month) %>% 
+		mutate(year=ifelse(Month %in% c("July","August","September","October","November","December"),sub("(.+)\\/(.+)","\\1",FY),sub("(.{2})(.+)\\/(.+)","\\1\\3",FY))) %>% 
+		  select(-FY) %>% 
+		  mutate(year=replace(year, year=="1900", "2000"),
+                         yrmon=paste(Month,year,sep="-"),
+			 yrmon=as.yearmon(yrmon,"%B-%Y"),
+			 amount=as.numeric(amount)
+			 ) %>% 
+		  select(yrmon,amount) 
+
+rice.pub.cl.mo  <- rice.pub.cl.mo %>% 
+                      filter(!is.na(amount))
+		    
+
+save(rice.pub.cl.mo, file ="./RDATA/rice_pub_cl_mo.RData")
+load("./RDATA/rice_pub_cl_mo.RData")
+```
+
+Now let's view the chart
+
+
+```{r pubstock  }
+rice.pub.cl.mo %>% 
+    filter(year(yrmon) > 2011) %>% 
+    ggplot(aes(x=yrmon,y=amount)) +
+	    geom_line()
+```
+
+Let's have a look at the yearly pattern
+
+
+```{r pubstock4  }
+rice.pub.cl.mo %>% 
+    mutate(mo=month(yrmon),
+	   yr=year(yrmon)) %>% 
+    filter(yr  > 2011) %>% 
+    ggplot(aes(x=mo,y=amount)) +
+	    geom_line() +
+	    facet_wrap(~yr)
+```
+
+
+
+
+the above is quite zigzag, kind of random pattern, so let's smoothen it by converting to yearly
+
+```{r pssmooth  }
+rice.pub.yr <- rice.pub.cl.mo %>% 
+     tq_transmute(select=amount,
+		  mutate_fun=to.yearly,
+		  FUN=median)
+```
+now let's plot it
+
+
+```{r smplot  }
+rice.pub.yr %>% 
+    ggplot(aes(x=year(yrmon),y=amount))+
+	    geom_line()
+```
+
+its too zig zagy
+
+let's try whether ma can smooth it further
+
+
+```{r mas  }
+rice.pub.yr %>% 
+    tq_transmute(select=amount,
+		 mutate_fun=SMA,
+		 n=3,
+		 col_rename="amount") %>% 
+    filter(!is.na(amount)) %>% 
+    ggplot(aes(x=year(yrmon),y=amount)) +
+	   geom_line()
+```
+
+
+the smoothening clearly shows that there is recent downward trend
+
+
+let's use the same mechanism in monthly date
+
+```{r mos  }
+rice.pub.ma <- rice.pub.cl.mo %>% 
+	    tq_transmute(select=amount,
+		 mutate_fun=SMA,
+		 n=3,
+		 col_rename="amount") %>% 
+		filter(!is.na(amount))
+```
+
+now let's smoothen it
+
+
+```{r mos2  }
+rice.pub.ma %>% 
+    ggplot(aes(x=yrmon,y=amount))+
+    geom_line()
+```
+
+Let's increase the windown
+
+
+
+```{r inw  }
+rice.pub.cl.mo %>% 
+	    tq_transmute(select=amount,
+		 mutate_fun=SMA,
+		 n=10,
+		 col_rename="amount") %>% 
+		filter(!is.na(amount)) %>% 
+		ggplot(aes(x=yrmon,y=amount))+
+		    geom_line()
+
+```
+
+okay, good, it smoothened quite a bit
+
+let's increase it even further
+
+```{r inw  }
+rice.pub.cl.mo %>% 
+	    tq_transmute(select=amount,
+		 mutate_fun=SMA,
+		 n=20,
+		 col_rename="amount") %>% 
+		filter(!is.na(amount)) %>% 
+		ggplot(aes(x=yrmon,y=amount))+
+		    geom_line() +
+		    geom_smooth(method="lm")
+
+```
+
+let's have a MA over the last three years
+
+
+```{r inw2  }
+rice.pub.cl.mo %>% 
+    filter(year(yrmon) > 2013) %>% 
+	    tq_transmute(select=amount,
+		 mutate_fun=SMA,
+		 n=3,
+		 col_rename="amount") %>% 
+		filter(!is.na(amount)) %>% 
+		ggplot(aes(x=yrmon,y=amount))+
+		    geom_line() +
+		    geom_smooth(method="lm")
+
+```
+
+so it clearly shows that there is a downward trend for last three years of public stock
+
+let's zoom into last five years
+
+
+```{r pubstock5  }
+rice.pub.cl.mo %>% 
+    filter(year(yrmon)>2011) %>% 
+    ggplot(aes(x=yrmon,y=amount)) +
+	    geom_line()
+```
+
+
+let's zoom further, how about last two years
+
+
+```{r pubstock2  }
+rice.pub.cl.mo %>% 
+    filter(year(yrmon)>2014) %>% 
+    ggplot(aes(x=yrmon,y=amount)) +
+	    geom_line()
+```
+
+how about three years?
+
+
+```{r pubstock3  }
+rice.pub.cl.mo %>% 
+    filter(year(yrmon)>2013) %>% 
+    ggplot(aes(x=yrmon,y=amount)) +
+	    geom_line()
+```
+
+
+
+
+Lets' have a look at year-wise distribution
+
+
+```{r ps3  }
+rice.pub.cl.mo %>% 
+    filter(year(yrmon) > 2012) %>% 
+    ggplot(aes(x=month(yrmon),y=amount))+
+    geom_line() +
+    facet_wrap(~year(yrmon))
+```
+
+## FOOD GRAIN PROCUREMENT
+
+### AMAN 
+
+```{r ps4  }
+url  <- read_html("http://fpmu.gov.bd/fpmu-database/0301.htm")
+aman.proc.raw <- url %>% 
+            html_node("table") %>% 
+	    html_table(fill=TRUE) %>% 
+	    slice(8:29)
+
+var.aman.proc <- c("year","paddy.tar","rice.tar","rice.in.tar", 
+			"paddy.act","rice.act","rice.in.act",
+			"paddy.price","rice.price.pbl","rice.price.atp",
+			"proc.start", "proc.close")
+
+names(aman.proc.raw)  <- var.aman.proc
+aman.proc <- aman.proc.raw %>% 
+		mutate_at(vars(-year,-proc.start,-proc.close), as.numeric)
+save(aman.proc, file="./RDATA/aman_proc.RData")
+```
+
+### BORO
+
+```{r borop  }
+url  <- read_html("http://fpmu.gov.bd/fpmu-database/0302.htm")
+boro.proc.raw  <- url %>% 
+		    html_node("table") %>% 
+		    html_table(fill=TRUE) %>% 
+		    slice(8:29)
+
+var.boro.proc <- c("year","paddy.tar","rice.tar","rice.in.tar", 
+			"paddy.act","rice.act","rice.in.act",
+			"paddy.price","rice.price",
+			"proc.start", "proc.close")
+
+names(boro.proc.raw)  <- var.boro.proc
+
+boro.proc <- boro.proc.raw %>% 
+		mutate_at(vars(-year,-proc.start,-proc.close), as.numeric)
+	    
+save(boro.proc, file="./RDATA/boro_proc.RData")
+
+```
+
+###  Month-wise rice procurement
+
+let's collect data on month-wise rice procurement
+
+```{r moproc  }
+url  <- read_html("http://fpmu.gov.bd/fpmu-database/0304.htm")
+rice.proc.mo.raw <- url %>% 
+		    html_node("table") %>% 
+		    html_table(fill=TRUE) %>% 
+		    slice(5:17)
+names(rice.proc.mo.raw)  <- rice.proc.mo.raw %>% slice(1)
+rice.proc.mo.df  <- rice.proc.mo.raw %>% 
+		    slice(-1) 
+```
+
+Now time to tidy up things
+
+```{r mpt  }
+rice.proc.mo.td <- rice.proc.mo.df %>% 
+	    gather(FY,amount,-Month)
+
+rice.proc.mo.td2  <- rice.proc.mo.td %>% 
+		mutate(year=ifelse(Month %in% c("July","August","September","October","November","December"),sub("(.+)\\/(.+)","\\1",FY),sub("(.{2})(.+)\\/(.+)","\\1\\3",FY))) %>% 
+		select(-FY) %>% 
+		mutate(year=replace(year, year=="1900", "2000")  ,
+		       yrmon=paste(year,Month,sep="-"),
+		       yrmon=as.yearmon(yrmon,format="%Y-%B"),
+		       amount=as.numeric(amount)
+		       )  %>% 
+		select(yrmon,amount)
+save(rice.proc.mo.td2, file="./RDATA/rice_proc_mo_td2.RData")
+
+```
+
+### District wise procurement
+
+```{r distproc  }
+url  <- read_html("http://fpmu.gov.bd/fpmu-database/0307.htm")
+proc.dist.raw  <- url %>% 
+		html_node("table") %>% 
+		html_table(fill=TRUE)
+save(proc.dist.raw, file="./RDATA/proc_dist_raw.RData")
+```
+
+
+# IMPORTS of RICE
+
+## Yearly imports
+
+let's bring in the data first
+
+```{r impy  }
+url  <- read_html("http://fpmu.gov.bd/fpmu-database/0501.htm")
+rice.yr.imp.raw <- url %>% 
+               html_node("table") %>% 
+	       html_table(fill=TRUE) %>% 
+	       slice(7:33)
+var.rice.yr.imp <- c("FY","rice.aid","wheat.aid","total.aid",
+		     "rice.gob.comm","wheat.gob.comm","total.gob.comm",
+		     "rice.tot.gob.imp","wheat.tot.gob.imp","total.gob.imp",
+		     "rice.pri.imp","wheat.pri.imp","total.pri.imp", 
+		     "rice.national.imp","wheat.national.imp","total.national.imp")
+names(rice.yr.imp.raw)  <- var.rice.yr.imp
+rmcom <- function(x) {sub(",","",x)}
+rice.yr.imp <- rice.yr.imp.raw %>% 
+		 mutate_all(funs(rmcom)) %>% 
+                 mutate_at(vars(-FY),as.numeric) %>%
+		 mutate(FY=sub("\\*$","",FY),
+			FY=sub("(^\\d{2}).+(\\d{2}$)","FY\\2",FY),
+			FY=factor(FY,levels=FY)
+			)
+save(rice.yr.imp, file="./RDATA/rice_yr_imp.RData")
+		    
+```
+
+Now time to plot some of the import data
+
+```{r imppl  }
+load("./RDATA/rice_yr_imp.RData")
+rice.yr.imp %>% 
+    gather(key,value,-FY) %>% 
+    ggplot(aes(x=FY,y=value,color=key)) +
+	   geom_line(group="") +
+	   facet_wrap(~key, ncol=3, scale="free_y")
+```
+
